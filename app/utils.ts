@@ -31,41 +31,12 @@ export async function copyToClipboard(text: string) {
   }
 }
 
-export async function downloadAs(text: string, filename: string) {
-  if (window.__TAURI__) {
-    const result = await window.__TAURI__.dialog.save({
-      defaultPath: `${filename}`,
-      filters: [
-        {
-          name: `${filename.split('.').pop()} files`,
-          extensions: [`${filename.split('.').pop()}`],
-        },
-        {
-          name: "All Files",
-          extensions: ["*"],
-        },
-      ],
-    });
-
-    if (result !== null) {
-      try {
-        await window.__TAURI__.fs.writeBinaryFile(
-          result,
-          new Uint8Array([...text].map((c) => c.charCodeAt(0)))
-        );
-        showToast(Locale.Download.Success);
-      } catch (error) {
-        showToast(Locale.Download.Failed);
-      }
-    } else {
-      showToast(Locale.Download.Failed);
-    }
-  } else {
-    const element = document.createElement("a");
-    element.setAttribute(
-      "href",
-      "data:text/plain;charset=utf-8," + encodeURIComponent(text),
-    );
+export function downloadAs(text: string, filename: string) {
+  const element = document.createElement("a");
+  element.setAttribute(
+    "href",
+    "data:text/plain;charset=utf-8," + encodeURIComponent(text),
+  );
   element.setAttribute("download", filename);
 
   element.style.display = "none";
@@ -75,7 +46,7 @@ export async function downloadAs(text: string, filename: string) {
 
   document.body.removeChild(element);
 }
-}
+
 export function readFromFile() {
   return new Promise<string>((res, rej) => {
     const fileInput = document.createElement("input");
@@ -201,16 +172,4 @@ export function autoGrowTextArea(dom: HTMLTextAreaElement) {
 
 export function getCSSVar(varName: string) {
   return getComputedStyle(document.body).getPropertyValue(varName).trim();
-}
-
-/**
- * Detects Macintosh
- */
-export function isMacOS(): boolean {
-  if (typeof window !== "undefined") {
-    let userAgent = window.navigator.userAgent.toLocaleLowerCase();
-    const macintosh = /iphone|ipad|ipod|macintosh/.test(userAgent)
-    return !!macintosh
-  }
-  return false
 }
