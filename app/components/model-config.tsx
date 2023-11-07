@@ -76,7 +76,7 @@ export function ModelConfigList(props: {
         <input
           type="number"
           min={100}
-          max={100000}
+          max={32000}
           value={props.modelConfig.max_tokens}
           onChange={(e) =>
             props.updateConfig(
@@ -169,7 +169,7 @@ export function ModelConfigList(props: {
           title={props.modelConfig.historyMessageCount.toString()}
           value={props.modelConfig.historyMessageCount}
           min="0"
-          max="64"
+          max="32"
           step="1"
           onChange={(e) =>
             props.updateConfig(

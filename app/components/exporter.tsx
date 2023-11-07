@@ -127,7 +127,7 @@ export function MessageExporter() {
   ];
   const { currentStep, setCurrentStepIndex, currentStepIndex } =
     useSteps(steps);
-  const formats = ["text", "image", "json"] as const;
+  const formats = ["text", "image"] as const;
   type ExportFormat = (typeof formats)[number];
 
   const [exportConfig, setExportConfig] = useState({
@@ -157,21 +157,7 @@ export function MessageExporter() {
     session.mask.context,
     selection,
   ]);
-  function preview() {
-    if (exportConfig.format === "text") {
-      return (
-        <MarkdownPreviewer messages={selectedMessages} topic={session.topic} />
-      );
-    } else if (exportConfig.format === "json") {
-      return (
-        <JsonPreviewer messages={selectedMessages} topic={session.topic} />
-      );
-    } else {
-      return (
-        <ImagePreviewer messages={selectedMessages} topic={session.topic} />
-      );
-    }
-  }
+
   return (
     <>
       <Steps
@@ -226,7 +212,16 @@ export function MessageExporter() {
         />
       </div>
       {currentStep.value === "preview" && (
-        <div className={styles["message-exporter-body"]}>{preview()}</div>
+        <div className={styles["message-exporter-body"]}>
+          {exportConfig.format === "text" ? (
+            <MarkdownPreviewer
+              messages={selectedMessages}
+              topic={session.topic}
+            />
+          ) : (
+            <ImagePreviewer messages={selectedMessages} topic={session.topic} />
+          )}
+        </div>
       )}
     </>
   );
@@ -383,7 +378,7 @@ export function PreviewActions(props: {
 function ExportAvatar(props: { avatar: string }) {
   if (props.avatar === DEFAULT_MASK_AVATAR) {
     return (
-      <img
+      <NextImage
         src={BotIcon.src}
         width={30}
         height={30}
@@ -393,7 +388,7 @@ function ExportAvatar(props: { avatar: string }) {
     );
   }
 
-  return <Avatar avatar={props.avatar} />;
+  return <Avatar avatar={props.avatar}></Avatar>;
 }
 
 export function ImagePreviewer(props: {
@@ -422,7 +417,6 @@ export function ImagePreviewer(props: {
           ])
           .then(() => {
             showToast(Locale.Copy.Success);
-            refreshPreview();
           });
       } catch (e) {
         console.error("[Copy Image] ", e);
@@ -433,62 +427,24 @@ export function ImagePreviewer(props: {
 
   const isMobile = useMobileScreen();
 
-  const download = async () => {
+  const download = () => {
     showToast(Locale.Export.Image.Toast);
     const dom = previewRef.current;
     if (!dom) return;
-  
-    const isApp = getClientConfig()?.isApp;
-  
-    try {
-      const blob = await toPng(dom);
-      if (!blob) return;
-  
-      if (isMobile || (isApp && window.__TAURI__)) {
-        if (isApp && window.__TAURI__) {
-          const result = await window.__TAURI__.dialog.save({
-            defaultPath: `${props.topic}.png`,
-            filters: [
-              {
-                name: "PNG Files",
-                extensions: ["png"],
-              },
-              {
-                name: "All Files",
-                extensions: ["*"],
-              },
-            ],
-          });
-  
-          if (result !== null) {
-            const response = await fetch(blob);
-            const buffer = await response.arrayBuffer();
-            const uint8Array = new Uint8Array(buffer);
-            await window.__TAURI__.fs.writeBinaryFile(result, uint8Array);
-            showToast(Locale.Download.Success);
-          } else {
-            showToast(Locale.Download.Failed);
-          }
-        } else {
-          showImageModal(blob);
-        }
-      } else {
-        const link = document.createElement("a");
-        link.download = `${props.topic}.png`;
-        link.href = blob;
-        link.click();
-        refreshPreview();
-      }
-    } catch (error) {
-      showToast(Locale.Download.Failed);
-    }
-  };
+    toPng(dom)
+      .then((blob) => {
+        if (!blob) return;
 
-  const refreshPreview = () => {
-    const dom = previewRef.current;
-    if (dom) {
-      dom.innerHTML = dom.innerHTML; // Refresh the content of the preview by resetting its HTML for fix a bug glitching
-    }
+        if (isMobile || getClientConfig()?.isApp) {
+          showImageModal(blob);
+        } else {
+          const link = document.createElement("a");
+          link.download = `${props.topic}.png`;
+          link.href = blob;
+          link.click();
+        }
+      })
+      .catch((e) => console.log("[Export Image] ", e));
   };
 
   return (
@@ -514,9 +470,9 @@ export function ImagePreviewer(props: {
           </div>
 
           <div>
-            <div className={styles["main-title"]}>ChatGPT Next Web</div>
+            <div className={styles["main-title"]}>Sensing ChatRobot</div>
             <div className={styles["sub-title"]}>
-              github.com/Yidadaa/ChatGPT-Next-Web
+              /#/
             </div>
             <div className={styles["icons"]}>
               <ExportAvatar avatar={config.avatar} />
@@ -589,59 +545,16 @@ export function MarkdownPreviewer(props: {
   const download = () => {
     downloadAs(mdText, `${props.topic}.md`);
   };
+
   return (
     <>
       <PreviewActions
         copy={copy}
         download={download}
-        showCopy={true}
         messages={props.messages}
       />
       <div className="markdown-body">
         <pre className={styles["export-content"]}>{mdText}</pre>
-      </div>
-    </>
-  );
-}
-
-// modified by BackTrackZ now it's looks better
-
-export function JsonPreviewer(props: {
-  messages: ChatMessage[];
-  topic: string;
-}) {
-  const msgs = {
-    messages: [
-      {
-        role: "system",
-        content: `${Locale.FineTuned.Sysmessage} ${props.topic}`,
-      },
-      ...props.messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      })),
-    ],
-  };
-  const mdText = "```json\n" + JSON.stringify(msgs, null, 2) + "\n```";
-  const minifiedJson = JSON.stringify(msgs);
-
-  const copy = () => {
-    copyToClipboard(minifiedJson);
-  };
-  const download = () => {
-    downloadAs(JSON.stringify(msgs), `${props.topic}.json`);
-  };
-
-  return (
-    <>
-      <PreviewActions
-        copy={copy}
-        download={download}
-        showCopy={false}
-        messages={props.messages}
-      />
-      <div className="markdown-body" onClick={copy}>
-        <Markdown content={mdText} />
       </div>
     </>
   );
